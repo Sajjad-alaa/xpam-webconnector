@@ -21,8 +21,9 @@ sed -i "s@root: INFO@root: ${LOG_LEVEL}@g" /opt/chen/config/application.yml
 
 echo
 date
-echo "CHEN Version $VERSION, more see https://www.jumpserver.org"
+echo "XPAM WebConnector"
 echo "Quit the server with CONTROL-C."
 echo
 
-exec "$@"
+# The launcher prints its settings at startup; keep the registration token out of the container log
+exec "$@" > >(sed -u -E 's/(BootstrapToken:)[^ ]+/\1***/') 2>&1
