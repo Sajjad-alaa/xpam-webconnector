@@ -240,7 +240,12 @@ public class BaseSession implements Session {
         this.getPacketIO().close();
         var path = this.getTempPath();
         if (path.toFile().exists()) {
-            path.toFile().delete();
+            // XPAM: the folder holds exports and uploads; File.delete() never removed a non-empty folder
+            try (var walk = java.nio.file.Files.walk(path)) {
+                walk.sorted(java.util.Comparator.reverseOrder()).forEach(p -> p.toFile().delete());
+            } catch (java.io.IOException ignored) {
+                // best effort
+            }
         }
     }
 

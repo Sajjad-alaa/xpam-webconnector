@@ -72,7 +72,8 @@ public class SessionWebSocketHandler extends TextWebSocketHandler {
                     """.formatted(
                     MessageUtils.get("initializingDatasourceFailedMessage"),
                     MessageUtils.get("ErrorMessage"),
-                    e.getMessage()));
+                    // XPAM: the message can come from the database server (or echo asset fields)
+                    org.springframework.web.util.HtmlUtils.htmlEscape(String.valueOf(e.getMessage()))));
 
 
             sess.getController().showDialog(dialog);

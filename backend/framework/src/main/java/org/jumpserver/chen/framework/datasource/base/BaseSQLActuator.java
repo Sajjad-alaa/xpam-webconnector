@@ -1015,10 +1015,15 @@ public abstract class BaseSQLActuator implements SQLActuator {
                 if (p.isEmpty()) continue;
 
                 try {
-                    // 先整体转义，避免用户写的正则符号被误解释
-                    String regex = Pattern.quote(p);
-                    // 把被转义的 \* 恢复为 .*
-                    regex = regex.replace("\\*", ".*");
+                    // XPAM: quote each part between the "*" wildcards, then join them with ".*"
+                    // (quoting the whole rule first left "*" inside \Q...\E, so no wildcard ever matched)
+                    StringBuilder rb = new StringBuilder();
+                    String[] parts = p.split("\\*", -1);
+                    for (int k = 0; k < parts.length; k++) {
+                        if (k > 0) rb.append(".*");
+                        if (!parts[k].isEmpty()) rb.append(Pattern.quote(parts[k]));
+                    }
+                    String regex = rb.toString();
                     // 加上锚点，实现整串匹配
                     regex = "^" + regex + "$";
 

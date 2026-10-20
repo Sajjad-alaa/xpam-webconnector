@@ -60,6 +60,21 @@ public class RegisterJMSEvent {
 
     public static StreamObserver<ServiceOuterClass.FinishedTaskRequest> requestObserver;
 
+    // XPAM: the task stream comes back after an error (with a pause), instead of staying dead
+    private void resubscribe() {
+        Thread t = new Thread(() -> {
+            try {
+                Thread.sleep(5000);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            this.waitForKillSessionMessage();
+        }, "jms-task-resubscribe");
+        t.setDaemon(true);
+        t.start();
+    }
+
     private void waitForKillSessionMessage() {
         requestObserver = ServiceGrpc
                 .newStub(this.serviceBlockingStub.getChannel())
@@ -76,6 +91,9 @@ public class RegisterJMSEvent {
                             }
                         }
                         if (targetSession != null) {
+                            // XPAM: one failing task (e.g. a session that never opened its websocket) must
+                            // not end the stream: kill, lock and expiry would then stop for every session
+                            try {
                             switch (taskResponse.getTask().getAction()) {
                                 case KillSession ->
                                         targetSession.close("SessionClosedBy", "admin_terminate", taskResponse.getTask().getTerminatedBy());
@@ -86,6 +104,10 @@ public class RegisterJMSEvent {
                                 case TokenPermExpired ->
                                         targetSession.setDynamicEndInfo(taskResponse.getTask().getTokenStatus().getDetail());
                                 case TokenPermValid -> targetSession.resetDynamicEndInfo();
+                            }
+                            } catch (Exception e) {
+                                log.error("task {} failed for session {}", taskResponse.getTask().getAction(),
+                                        taskResponse.getTask().getSessionId(), e);
                             }
                             var req = ServiceOuterClass.FinishedTaskRequest
                                     .newBuilder()
@@ -99,12 +121,13 @@ public class RegisterJMSEvent {
                     @Override
                     public void onError(Throwable throwable) {
                         log.error("waitSessionMessage error", throwable);
-
+                        resubscribe();
                     }
 
                     @Override
                     public void onCompleted() {
                         log.error("waitSessionMessage completed");
+                        resubscribe();
                     }
                 });
     }

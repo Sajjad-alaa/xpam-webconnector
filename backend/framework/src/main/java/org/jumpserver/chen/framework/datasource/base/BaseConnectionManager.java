@@ -26,7 +26,8 @@ public abstract class BaseConnectionManager implements ConnectionManager {
     private final DBConnectInfo connectInfo;
     @Getter
     private final Datasource datasource;
-    private final Map<String, DruidDataSource> dataSourceMap = new HashMap<>();
+    // XPAM: concurrent REST and console calls must not create duplicate pools that are never closed
+    private final Map<String, DruidDataSource> dataSourceMap = new java.util.concurrent.ConcurrentHashMap<>();
     private final ThreadLocal<String> currentDatabase = new ThreadLocal<>();
 
     protected SQLActuator sqlActuator;
@@ -142,7 +143,7 @@ public abstract class BaseConnectionManager implements ConnectionManager {
         }
     }
 
-    public DruidDataSource getOrInitDataSource(String database) throws SQLException {
+    public synchronized DruidDataSource getOrInitDataSource(String database) throws SQLException {
         if (StringUtils.isEmpty(database)) {
             database = this.connectInfo.getDb();
         }

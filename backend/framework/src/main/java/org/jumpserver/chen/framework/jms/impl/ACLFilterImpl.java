@@ -347,6 +347,17 @@ public class ACLFilterImpl implements ACLFilter {
     }
 
 
+    static String withoutComments(String sql) {
+        if (sql == null) {
+            return "";
+        }
+        String out = sql.replaceAll("(?s)/\\*!\\d*", " ")   // MySQL executable comments run their content
+                .replaceAll("(?s)/\\*.*?\\*/", " ")
+                .replaceAll("(?m)(--|#)[^\\n]*", " ")
+                .replaceAll("\\*/", " ");
+        return out.replaceAll("\\s+", " ").trim();
+    }
+
     private Common.CommandACL matchRule(String command, ACLResult result) {
         for (Common.CommandACL commandACL : this.commandACLs) {
             for (Common.CommandGroup commandGroup : commandACL.getCommandGroupsList()) {
@@ -357,7 +368,10 @@ public class ACLFilterImpl implements ACLFilter {
                 }
                 try {
                     Pattern pattern = Pattern.compile(commandGroup.getPattern(), flags);
-                    if (pattern.matcher(command.toLowerCase()).find()) {
+                    // XPAM: the rule's own flag decides about case (lower-casing first made every
+                    // case-sensitive rule with a capital letter impossible to match), and the statement
+                    // is also checked without SQL comments ("drop/**/table", MySQL "/*!...*/")
+                    if (pattern.matcher(command).find() || pattern.matcher(withoutComments(command)).find()) {
                         result.setCmdAclId(commandACL.getId());
                         result.setCmdGroupId(commandGroup.getId());
                         return commandACL;

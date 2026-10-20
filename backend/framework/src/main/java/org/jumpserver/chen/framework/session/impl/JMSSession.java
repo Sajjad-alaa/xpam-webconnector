@@ -88,13 +88,17 @@ public class JMSSession extends BaseSession {
 
         this.lockCreator = creator;
         this.locked = true;
-        this.getController().showMessage(MessageLevel.ERROR, MessageUtils.get("SessionLockedMessage", this.lockCreator));
+        if (this.getController() != null) {
+            this.getController().showMessage(MessageLevel.ERROR, MessageUtils.get("SessionLockedMessage", this.lockCreator));
+        }
     }
 
     public void unloadSession(String creator) {
         SessionManager.setContext(this.getWebToken());
 
-        this.getController().showMessage(MessageLevel.SUCCESS, MessageUtils.get("SessionUnlockedMessage", creator));
+        if (this.getController() != null) {
+            this.getController().showMessage(MessageLevel.SUCCESS, MessageUtils.get("SessionUnlockedMessage", creator));
+        }
         this.locked = false;
         this.lockCreator = null;
     }
@@ -120,6 +124,26 @@ public class JMSSession extends BaseSession {
         this.canCopy = tokenResp.getData().getPermission().getEnableCopy();
         this.canPaste = tokenResp.getData().getPermission().getEnablePaste();
         this.dataMaskingRules = tokenResp.getData().getDataMaskingRulesList();
+        this.reapIfNeverOpened();
+    }
+
+    // XPAM: a session that authenticates but never opens its websocket would otherwise stay "online" in
+    // XPAM forever, keep a datasource and a gateway forward, and its token would keep working
+    private void reapIfNeverOpened() {
+        Thread reaper = new Thread(() -> {
+            try {
+                Thread.sleep(90_000);
+            } catch (InterruptedException ignored) {
+                Thread.currentThread().interrupt();
+                return;
+            }
+            if (this.replayHandler == null && !this.closed) {
+                log.info("closing session {}: the web client never connected", this.jmsSession.getId());
+                this.close();
+            }
+        }, "jms-session-reaper");
+        reaper.setDaemon(true);
+        reaper.start();
     }
 
 
@@ -237,9 +261,11 @@ public class JMSSession extends BaseSession {
                     Thread.sleep(5000);
 
                     synchronized (this) {
-                        var expireTime = LocalDateTime.ofEpochSecond(this.expireTime, 0, ZoneOffset.ofHours(8));
+                        // XPAM: compare instants (the hard-coded UTC+8 made expiry hours late in other zones)
+                        var expireTime = LocalDateTime.ofEpochSecond(this.expireTime, 0,
+                                java.time.ZoneId.systemDefault().getRules().getOffset(java.time.Instant.ofEpochSecond(this.expireTime)));
 
-                        if (LocalDateTime.now().isAfter(expireTime)) {
+                        if (java.time.Instant.now().getEpochSecond() > this.expireTime) {
                             this.close("PermissionsExpiredOn", "permission_expired", expireTime.format(DateTimeFormatter.ofPattern("yyyy-MM-dd HH:mm:ss")));
                             return;
                         }
@@ -282,7 +308,9 @@ public class JMSSession extends BaseSession {
         }
         this.closeConsoles();
         try {
-            this.replayHandler.release();
+            if (this.replayHandler != null) {
+                this.replayHandler.release();
+            }
             this.finishedJmsSession();
             this.closeGateway();
             if (!this.closed) {
@@ -300,11 +328,14 @@ public class JMSSession extends BaseSession {
         }
         SessionManager.setContext(this.getWebToken());
         try {
-            this.getPacketIO().sendPacket("session_close", sessionClosePacketData(reason, args));
-
-            var dialog = new Dialog(MessageUtils.get("SessionFinished"));
-            dialog.setBody(MessageUtils.get(message, args));
-            this.getController().showDialog(dialog);
+            if (this.getPacketIO() != null) {
+                this.getPacketIO().sendPacket("session_close", sessionClosePacketData(reason, args));
+            }
+            if (this.getController() != null) {
+                var dialog = new Dialog(MessageUtils.get("SessionFinished"));
+                dialog.setBody(MessageUtils.get(message, args));
+                this.getController().showDialog(dialog);
+            }
 
             this.recordLifecycle(ServiceOuterClass.SessionLifecycleLogRequest.EventType.AssetConnectFinished, reason);
             this.closed = true;
