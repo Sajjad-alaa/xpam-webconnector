@@ -237,7 +237,9 @@ public class BaseSession implements Session {
         this.closeConsoles();
         SessionManager.unregisterSession(this.getWebToken());
         this.getDatasource().close();
-        this.getPacketIO().close();
+        if (this.getPacketIO() != null) {
+            this.getPacketIO().close();
+        }
         var path = this.getTempPath();
         if (path.toFile().exists()) {
             // XPAM: the folder holds exports and uploads; File.delete() never removed a non-empty folder

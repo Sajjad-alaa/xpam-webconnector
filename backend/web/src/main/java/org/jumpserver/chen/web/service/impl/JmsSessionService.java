@@ -30,6 +30,7 @@ public class JmsSessionService implements SessionService {
         var tokenResp = this.getTokenResponse(token);
         var jmsSession = this.createJMSSession(tokenResp, remoteAddr);
 
+        try {
         if (StringUtils.isNotBlank(tokenResp.getData().getFaceMonitorToken())) {
             var faceMonitorToken = tokenResp.getData().getFaceMonitorToken();
 
@@ -49,6 +50,15 @@ public class JmsSessionService implements SessionService {
         var session = new JMSSession(jmsSession, datasource, remoteAddr, this.serviceBlockingStub, tokenResp);
         this.handleGateways(tokenResp, session, datasource);
         return session;
+        } catch (RuntimeException e) {
+            // XPAM: do not leave the core session "online" when the connection could not be set up
+            try {
+                this.closeSession(jmsSession);
+            } catch (RuntimeException ce) {
+                log.error("finish session failed", ce);
+            }
+            throw e;
+        }
     }
 
     private void handleGateways(ServiceOuterClass.TokenResponse tokenResp, Session session, Datasource dataSource) {
@@ -65,6 +75,9 @@ public class JmsSessionService implements SessionService {
                 .build();
 
         var resp = this.serviceBlockingStub.createForward(req);
+        if (resp.getStatus() != null && !resp.getStatus().getOk()) {
+            throw new RuntimeException(resp.getStatus().getErr());
+        }
 
         dataSource.getConnectInfo().setProxyHost("127.0.0.1");
         dataSource.getConnectInfo().setProxyPort(resp.getPort());
