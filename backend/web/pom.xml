@@ -29,6 +29,12 @@
                 <configuration>
                     <source>${maven.compiler.source}</source>
                     <target>${maven.compiler.target}</target>
+                    <!-- strip debug info, keep method parameter names (see root pom) -->
+                    <debug>false</debug>
+                    <parameters>true</parameters>
+                    <compilerArgs>
+                        <arg>-g:none</arg>
+                    </compilerArgs>
                 </configuration>
             </plugin>
         </plugins>

@@ -26,6 +26,15 @@
         <maven-compiler-plugin.version>3.9.0</maven-compiler-plugin.version>
         <maven.compiler.source>21</maven.compiler.source>
         <maven.compiler.target>21</maven.compiler.target>
+        <!-- Ship the jar without debug information: no source file names, line numbers or local-variable
+             names in the bytecode, so a decompiled jar is far less readable (locals become a1, a2, … and
+             stack traces carry no line numbers). Nothing is renamed, so Jackson JSON keys, Spring
+             component scanning, WebSocket/gRPC and the reflection-based action framework all keep working.
+             Method parameter names are kept on purpose (parameters=true): Spring needs them for the
+             unnamed @RequestParam/@PathVariable endpoints. Full name obfuscation (ProGuard) is not
+             applied: it would change the JSON API the console depends on and break Spring reflection. -->
+        <maven.compiler.debug>false</maven.compiler.debug>
+        <maven.compiler.parameters>true</maven.compiler.parameters>
         <project.build.sourceEncoding>UTF-8</project.build.sourceEncoding>
 
         <tomcat.version>10.1.61</tomcat.version>
@@ -56,6 +65,15 @@
                 <configuration>
                     <source>${java.version}</source>
                     <target>${java.version}</target>
+                    <!-- strip debug info (no source file, line numbers, local-variable names), keep
+                         method parameter names (Spring needs them for unnamed @RequestParam/@PathVariable) -->
+                    <debug>false</debug>
+                    <parameters>true</parameters>
+                    <!-- debug=false only omits -g (javac still emits line numbers + source file);
+                         -g:none removes them all. -parameters (above) is kept for Spring binding. -->
+                    <compilerArgs>
+                        <arg>-g:none</arg>
+                    </compilerArgs>
                     <annotationProcessorPaths>
                         <path>
                             <groupId>org.projectlombok</groupId>
