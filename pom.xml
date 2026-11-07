@@ -83,6 +83,18 @@
                     </annotationProcessorPaths>
                 </configuration>
             </plugin>
+            <plugin>
+                <!-- Do not embed the Maven descriptor (pom.xml / pom.properties) in the jars. It would
+                     otherwise ship inside the fat jar for every module and reveal the build layout,
+                     dependency versions and this compiler configuration. Applies to all modules. -->
+                <groupId>org.apache.maven.plugins</groupId>
+                <artifactId>maven-jar-plugin</artifactId>
+                <configuration>
+                    <archive>
+                        <addMavenDescriptor>false</addMavenDescriptor>
+                    </archive>
+                </configuration>
+            </plugin>
         </plugins>
     </build>
 
