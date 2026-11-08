@@ -12,8 +12,6 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-import java.util.Comparator;
-import java.util.List;
 import java.util.Locale;
 
 @RestController
@@ -50,42 +48,8 @@ public class AuthController {
         return request.getHeader("x-forwarded-for");
     }
 
+    // XPAM is English only, whatever the browser or the django_language cookie asks for
     private Locale getLanguage(HttpServletRequest request) {
-        var cookies = request.getCookies();
-
-        var langTag = "";
-
-        if (cookies != null) {
-            for (var cookie : cookies) {
-                if (cookie.getName().equals("django_language")) {
-                    langTag = cookie.getValue();
-                }
-            }
-        }
-
-        if (langTag.isEmpty()) {
-            langTag = getPreferredLanguage(request.getHeader("Accept-Language"));
-        }
-
-        return switch (langTag.toLowerCase()) {
-            case "ja" -> Locale.JAPAN;
-            case "ko" -> Locale.KOREAN;
-            case "pt", "pt-br", "pt_br" -> Locale.of("pt", "BR");
-            case "es", "ru", "vi" -> Locale.of(langTag.toLowerCase());
-            case "tw", "zh-hant", "zh-tw" -> Locale.TAIWAN;
-            case "zh", "zh-cn", "zh-hans" -> Locale.CHINA;
-            default -> Locale.US;
-        };
-    }
-
-    private String getPreferredLanguage(String acceptLanguage) {
-        if (acceptLanguage == null || acceptLanguage.isEmpty()) {
-            return null;
-        }
-        List<Locale.LanguageRange> languageRanges = Locale.LanguageRange.parse(acceptLanguage);
-
-        languageRanges.sort(Comparator.comparingDouble(Locale.LanguageRange::getWeight).reversed());
-
-        return languageRanges.get(0).getRange();
+        return Locale.US;
     }
 }
