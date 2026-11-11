@@ -5,8 +5,8 @@ set -euo pipefail
 script_dir=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" && pwd)
 chen_root=$(cd -- "${script_dir}/.." && pwd)
 wisp_root=${WISP_SOURCE:-"${chen_root}/../wisp"}
-source_dir="${wisp_root}/protobuf-java/org/jumpserver/wisp"
-target_dir="${chen_root}/backend/wisp/src/main/java/org/jumpserver/wisp"
+source_dir="${wisp_root}/protobuf-java/com/xpam/grpc/proto"
+target_dir="${chen_root}/backend/wisp/src/main/java/com/xpam/grpc/proto"
 
 if [[ ! -d "${source_dir}" ]]; then
     echo "Wisp Java protobuf output was not found: ${source_dir}" >&2

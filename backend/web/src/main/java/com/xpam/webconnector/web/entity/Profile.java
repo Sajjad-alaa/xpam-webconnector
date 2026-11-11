@@ -1,0 +1,13 @@
+package com.xpam.webconnector.web.entity;
+
+
+import lombok.Data;
+
+@Data
+public class Profile {
+    private String dbType;
+    private String Username;
+    private String AssetName;
+    private boolean canCopy = false;
+    private boolean canPaste = false;
+}

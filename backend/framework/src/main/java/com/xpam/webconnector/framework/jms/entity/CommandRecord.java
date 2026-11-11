@@ -1,0 +1,60 @@
+package com.xpam.webconnector.framework.jms.entity;
+
+import lombok.Data;
+import com.xpam.webconnector.framework.datasource.sql.SQLQueryResult;
+import com.xpam.webconnector.framework.i18n.MessageUtils;
+import com.xpam.webconnector.framework.jms.acl.ACLResult;
+import com.xpam.grpc.proto.Common;
+
+@Data
+public class CommandRecord {
+
+    private String input = "";
+    private String output = "";
+    private Common.RiskLevel riskLevel = Common.RiskLevel.Normal;
+    private String CmdGroupId;
+    private String CmdAclId;
+    private boolean error = false;
+
+    public CommandRecord(String input) {
+        this.input = input;
+    }
+
+    public void applyAcl(ACLResult aclResult) {
+        if (aclResult == null) {
+            return;
+        }
+        if (aclResult.getCmdAclId() != null) {
+            this.setCmdAclId(aclResult.getCmdAclId());
+        }
+        if (aclResult.getCmdGroupId() != null) {
+            this.setCmdGroupId(aclResult.getCmdGroupId());
+        }
+        if (aclResult.getRiskLevel() != null) {
+            this.setRiskLevel(aclResult.getRiskLevel());
+        }
+    }
+
+    public void setError(String errorMessage) {
+        this.error = true;
+        this.output = String.format(MessageUtils.getOrDefault("ErrorPrefix", "Error: %s"), errorMessage);
+    }
+
+    public void setOutput(SQLQueryResult result) {
+        if (this.error) {
+            this.output = String.format(MessageUtils.getOrDefault("ErrorPrefix", "Error: %s"), result.getOutput());
+            return;
+        }
+        if (!result.isHasResultSet()) {
+            this.output = result.getOutput();
+        } else {
+            this.output = String.format(
+                    MessageUtils.getOrDefault("QueryOkRows", "Query OK, %d rows discovered"),
+                    result.getData().size());
+        }
+    }
+
+    public void setOutput(String output) {
+        this.output = output;
+    }
+}

@@ -1,0 +1,48 @@
+package com.xpam.webconnector.framework.console;
+
+import lombok.Getter;
+import lombok.Setter;
+import com.xpam.webconnector.framework.datasource.Datasource;
+import com.xpam.webconnector.framework.console.component.Logger;
+import com.xpam.webconnector.framework.console.component.Messager;
+import com.xpam.webconnector.framework.console.context.ConsoleContext;
+import com.xpam.webconnector.framework.ws.io.PacketIO;
+import com.xpam.webconnector.framework.console.entity.request.Connect;
+import org.springframework.web.socket.WebSocketSession;
+
+import java.util.Map;
+
+
+@Setter
+@Getter
+public abstract class AbstractConsole implements Console {
+    private final Logger consoleLogger;
+    private final Datasource datasource;
+    private final PacketIO packetIO;
+    private final Messager messager;
+    private String title;
+    private final ConsoleContext context;
+
+    public String getTitle() {
+        return this.title;
+    }
+
+    public void onInit(Connect connect) {
+        this.packetIO.sendPacket("init", Map.of(
+                "title", this.title,
+                "consoleId", this.packetIO.getWsSession().getId()
+        ));
+    }
+
+    public String getNodeKey() {
+        return this.context.nodeKey();
+    }
+
+    protected AbstractConsole(Datasource datasource, WebSocketSession ws, ConsoleContext context) {
+        this.context = context;
+        this.datasource = datasource;
+        this.packetIO = new PacketIO(ws);
+        this.consoleLogger = new Logger(this.packetIO);
+        this.messager = new Messager(this.packetIO);
+    }
+}

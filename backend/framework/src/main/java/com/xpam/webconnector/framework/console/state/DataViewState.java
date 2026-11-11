@@ -1,0 +1,32 @@
+package com.xpam.webconnector.framework.console.state;
+
+import lombok.Data;
+import lombok.EqualsAndHashCode;
+import com.xpam.webconnector.framework.datasource.sql.SQLQueryParams;
+
+
+@EqualsAndHashCode(callSuper = true)
+@Data
+public class DataViewState extends State {
+    private String id;
+    private int page;
+    private int limit;
+    private int total;
+    private boolean truncated;
+    private int rowLimit;
+    private boolean pinned;
+    private boolean paged;
+    private String filter;
+
+    public DataViewState(String id, String title) {
+        super(title);
+        this.id = id;
+        this.paged = true;
+        this.pinned = false;
+        this.total = 0;
+        this.page = 1;
+        this.limit = 50;
+        this.filter = "";
+    }
+
+}

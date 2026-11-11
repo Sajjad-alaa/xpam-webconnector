@@ -5,8 +5,8 @@
 
 
     <parent>
-        <groupId>org.jumpserver</groupId>
-        <artifactId>chen</artifactId>
+        <groupId>com.xpam</groupId>
+        <artifactId>webconnector</artifactId>
         <version>${revision}</version>
     </parent>
 
