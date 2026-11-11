@@ -31,7 +31,7 @@ class UserVisibleMessageI18nTest {
     @BeforeEach
     void setUp() {
         ReloadableResourceBundleMessageSource messageSource = new ReloadableResourceBundleMessageSource();
-        Path bundle = propertiesDir().resolve("chen");
+        Path bundle = propertiesDir().resolve("messages");
         messageSource.setBasename(bundle.toUri().toString());
         messageSource.setDefaultEncoding("UTF-8");
         messageSource.setFallbackToSystemLocale(false);
@@ -102,7 +102,7 @@ class UserVisibleMessageI18nTest {
     void propertiesKeySetsStayAligned() throws Exception {
         Path dir = propertiesDir();
         List<Path> files = Files.list(dir)
-                .filter(path -> path.getFileName().toString().startsWith("chen")
+                .filter(path -> path.getFileName().toString().startsWith("messages")
                         && path.getFileName().toString().endsWith(".properties"))
                 .sorted()
                 .toList();

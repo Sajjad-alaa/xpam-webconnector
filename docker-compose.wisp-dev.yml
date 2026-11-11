@@ -7,8 +7,8 @@ services:
       - -Dfile.encoding=utf-8
       - -XX:+ExitOnOutOfMemoryError
       - -jar
-      - /opt/chen/chen.jar
-      - --spring.config.additional-location=optional:file:/opt/chen/config/
+      - /opt/webconnector/webconnector.jar
+      - --spring.config.additional-location=optional:file:/opt/webconnector/config/
       - --spring.profiles.active=dev
     environment:
       EXECUTE_PROGRAM: ""

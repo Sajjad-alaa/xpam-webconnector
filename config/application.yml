@@ -11,11 +11,11 @@ logging:
   level:
     root: INFO
   file:
-    name: data/logs/chen.log
+    name: data/logs/webconnector.log
 
 spring:
   messages:
-    basename: i18n/chen
+    basename: i18n/messages
     fallback-to-system-locale: false
 
 grpc:

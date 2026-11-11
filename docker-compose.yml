@@ -5,8 +5,8 @@ services:
       dockerfile: Dockerfile
     container_name: chen-backend-dev
     volumes:
-      - ./config:/opt/chen/config
-      - ./data:/opt/chen/data
+      - ./config:/opt/webconnector/config
+      - ./data:/opt/webconnector/data
     ports:
       - "8082:8082"
     environment:
@@ -15,8 +15,8 @@ services:
       BOOTSTRAP_TOKEN: ${BOOTSTRAP_TOKEN:-PleaseChangeMe}
       EXECUTE_PROGRAM: >-
         java -Dfile.encoding=utf-8 -XX:+ExitOnOutOfMemoryError
-        -jar /opt/chen/chen.jar
-        --spring.config.additional-location=optional:file:/opt/chen/config/
+        -jar /opt/webconnector/webconnector.jar
+        --spring.config.additional-location=optional:file:/opt/webconnector/config/
         --spring.profiles.active=dev
     restart: unless-stopped
 
