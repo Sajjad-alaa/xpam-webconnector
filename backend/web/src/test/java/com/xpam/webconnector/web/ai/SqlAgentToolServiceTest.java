@@ -118,11 +118,16 @@ class SqlAgentToolServiceTest {
                 DbType.db2
         );
 
+        // validate_sql reports parse result, count, type and objects only; riskLevel was dropped upstream
+        // in 06be93c "refactor(sql-ai): simplify Druid validation".
         for (DbType dialect : dialects) {
             Map<String, Object> result = SqlAgentToolService.validateSQL(dialect, "SELECT id FROM users");
             assertEquals(true, result.get("valid"), dialect.name());
             assertEquals(1, result.get("statementCount"), dialect.name());
-            assertEquals(1, result.get("riskLevel"), dialect.name());
+            // Druid's statement class name: SELECT, PGSELECT, ... depending on the dialect
+            assertTrue(((String) result.get("statementType")).endsWith("SELECT"), dialect.name());
+            assertEquals(List.of("users"), result.get("tables"), dialect.name());
+            assertFalse(result.containsKey("riskLevel"), dialect.name());
         }
     }
 
@@ -241,7 +246,7 @@ class SqlAgentToolServiceTest {
     }
 
     @Test
-    void identifiesMultiStatementWriteRisk() {
+    void identifiesMultiStatementSql() {
         Map<String, Object> result = SqlAgentToolService.validateSQL(
                 DbType.mysql,
                 "SELECT id FROM users; DELETE FROM users WHERE id = 1"
@@ -250,7 +255,7 @@ class SqlAgentToolServiceTest {
         assertEquals(true, result.get("valid"));
         assertEquals(2, result.get("statementCount"));
         assertEquals("MULTI", result.get("statementType"));
-        assertTrue(((Number) result.get("riskLevel")).intValue() >= 3);
+        assertEquals(List.of("users"), result.get("tables"));
     }
 
     @Test
@@ -360,8 +365,12 @@ class SqlAgentToolServiceTest {
         ));
     }
 
+    // Upstream e85b4af "Stop treating system catalog references as AI security failures": SQL the user
+    // already has in the editor may name information_schema and is analysed, not rejected. inspect_schema
+    // still refuses protected system schemas (metadataApprovalStaysInsideActiveSchema,
+    // reportsTheProtectedActiveSchemaPrecisely), and the assistant never executes SQL.
     @Test
-    void rejectsSystemCatalogReferencesWithoutBlockingValidTableAliases() {
+    void analysesSystemCatalogReferencesAndKeepsValidTableAliases() {
         String nodeKey = "datasource:root,schema:public";
         var session = mock(Session.class);
         var datasource = mock(Datasource.class);
@@ -406,7 +415,7 @@ class SqlAgentToolServiceTest {
                 .getAsJsonObject().getAsJsonObject("currentSqlAnalysis");
         assertEquals("users", aliasAnalysis.getAsJsonArray("tables").get(0).getAsString());
 
-        assertThrows(IllegalArgumentException.class, () -> service.resolveRequestContext(
+        var catalogContext = service.resolveRequestContext(
                 session,
                 """
                         {
@@ -421,8 +430,14 @@ class SqlAgentToolServiceTest {
                         }
                         """.formatted(nodeKey),
                 "explain"
-        ));
-        assertThrows(IllegalArgumentException.class, () -> service.resolveRequestContext(
+        );
+        var catalogAnalysis = JsonParser.parseString(catalogContext.sanitizedJson())
+                .getAsJsonObject().getAsJsonObject("currentSqlAnalysis");
+        assertTrue(catalogAnalysis.get("valid").getAsBoolean());
+        assertEquals("information_schema.tables",
+                catalogAnalysis.getAsJsonArray("tables").get(0).getAsString());
+
+        var brokenCatalogContext = service.resolveRequestContext(
                 session,
                 """
                         {
@@ -437,7 +452,11 @@ class SqlAgentToolServiceTest {
                         }
                         """.formatted(nodeKey),
                 "repair"
-        ));
+        );
+        var brokenAnalysis = JsonParser.parseString(brokenCatalogContext.sanitizedJson())
+                .getAsJsonObject().getAsJsonObject("currentSqlAnalysis");
+        assertFalse(brokenAnalysis.get("valid").getAsBoolean());
+        assertEquals(0, brokenAnalysis.getAsJsonArray("tables").size());
     }
 
     private static SqlAgentToolService.AgentRequestContext agentContext(

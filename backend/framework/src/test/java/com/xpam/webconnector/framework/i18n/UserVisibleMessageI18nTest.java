@@ -21,7 +21,6 @@ import java.util.stream.Collectors;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 class UserVisibleMessageI18nTest {
@@ -52,50 +51,45 @@ class UserVisibleMessageI18nTest {
         SessionManager.setContext(null);
     }
 
+    // XPAM is English only: a session locale that still says zh/ja/ru (old cookie, ?lang=) falls back
+    // to the English base bundle, never to a translation.
     @Test
-    void chineseAndEnglishUserVisibleMessagesDiffer() {
-        this.locale.set(Locale.US);
-        String enAffected = MessageUtils.get("AffectedRows");
-        String enUnknown = MessageUtils.get("Unknown");
-        String enUnsupported = SqlValidator.queryUnsupportedMessage();
-        String enExported = MessageUtils.get("RowsExported", 3);
-        String enError = MessageUtils.get("ErrorPrefix", "boom");
+    void userVisibleMessagesAreEnglishForEveryLocale() {
+        for (Locale sessionLocale : List.of(Locale.US, Locale.CHINA, Locale.TAIWAN, Locale.JAPAN, Locale.of("ru"))) {
+            this.locale.set(sessionLocale);
+            String name = sessionLocale.toLanguageTag();
+            assertEquals("Affected rows", MessageUtils.get("AffectedRows"), name);
+            assertEquals("unknown", MessageUtils.get("Unknown"), name);
+            assertEquals("Error: boom", MessageUtils.get("ErrorPrefix", "boom"), name);
+            assertEquals("3 rows exported", MessageUtils.get("RowsExported", 3), name);
+            assertEquals(SqlValidator.QUERY_UNSUPPORTED_MESSAGE, SqlValidator.queryUnsupportedMessage(), name);
+        }
+    }
 
-        this.locale.set(Locale.CHINA);
-        String zhAffected = MessageUtils.get("AffectedRows");
-        String zhUnknown = MessageUtils.get("Unknown");
-        String zhUnsupported = SqlValidator.queryUnsupportedMessage();
-        String zhExported = MessageUtils.get("RowsExported", 3);
-        String zhError = MessageUtils.get("ErrorPrefix", "boom");
-
-        assertEquals("Affected rows", enAffected);
-        assertEquals("unknown", enUnknown);
-        assertEquals("受影响行数", zhAffected);
-        assertEquals("未知", zhUnknown);
-        assertEquals("Error: boom", enError);
-        assertEquals("错误: boom", zhError);
-        assertNotEquals(enAffected, zhAffected);
-        assertNotEquals(enUnknown, zhUnknown);
-        assertNotEquals(enUnsupported, zhUnsupported);
-        assertNotEquals(enExported, zhExported);
-        assertTrue(enExported.contains("3"));
-        assertTrue(zhExported.contains("3"));
+    @Test
+    void onlyEnglishBundlesShip() throws Exception {
+        List<String> bundles = Files.list(propertiesDir())
+                .map(path -> path.getFileName().toString())
+                .filter(name -> name.startsWith("messages") && name.endsWith(".properties"))
+                .sorted()
+                .toList();
+        assertEquals(List.of("messages.properties", "messages_en.properties"), bundles);
     }
 
     @Test
     void affectedRowsTicketPrefixDoesNotRewriteSql() {
         String sql = "UPDATE accounts SET balance = balance - 10";
         this.locale.set(Locale.CHINA);
-        String zh = formatTicket(sql, null);
+        String unknownRows = formatTicket(sql, null);
         this.locale.set(Locale.US);
-        String en = formatTicket(sql, 3);
+        String knownRows = formatTicket(sql, 3);
 
-        assertTrue(zh.startsWith("受影响行数: 未知\n"));
-        assertTrue(zh.endsWith("\n" + sql));
-        assertTrue(en.startsWith("Affected rows: 3\n"));
-        assertTrue(en.endsWith("\n" + sql));
-        assertEquals(sql, zh.substring(zh.indexOf('\n') + 1));
-        assertEquals(sql, en.substring(en.indexOf('\n') + 1));
+        assertTrue(unknownRows.startsWith("Affected rows: unknown\n"), unknownRows);
+        assertTrue(unknownRows.endsWith("\n" + sql));
+        assertTrue(knownRows.startsWith("Affected rows: 3\n"), knownRows);
+        assertTrue(knownRows.endsWith("\n" + sql));
+        assertEquals(sql, unknownRows.substring(unknownRows.indexOf('\n') + 1));
+        assertEquals(sql, knownRows.substring(knownRows.indexOf('\n') + 1));
     }
 
     @Test

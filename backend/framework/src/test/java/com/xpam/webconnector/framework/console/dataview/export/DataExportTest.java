@@ -131,10 +131,10 @@ class DataExportTest {
         assertTrue(workbookXml.contains("Alice"));
         assertFalse(workbookXml.contains("ROWNUM"));
 
+        // f85c2a4 "fix(csv): omit trailing comma in data export": no trailing comma, no extra blank line
         String csvContent = Files.readString(csv);
-        assertEquals("ID,NAME," + System.lineSeparator()
-                + "7,Alice," + System.lineSeparator()
-                + System.lineSeparator(), csvContent);
+        assertEquals("ID,NAME" + System.lineSeparator()
+                + "7,Alice" + System.lineSeparator(), csvContent);
     }
 
     private String readWorkbookXml(Path workbook) throws IOException {
