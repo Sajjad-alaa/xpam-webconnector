@@ -42,6 +42,7 @@ import com.xpam.webconnector.framework.datasource.plan.PlanEffects;
 import com.xpam.webconnector.framework.datasource.plan.PlanLimits;
 import com.xpam.webconnector.framework.datasource.plan.PlanMode;
 import com.xpam.webconnector.framework.datasource.plan.PlanStatus;
+import com.xpam.webconnector.framework.datasource.analysis.SqlStatementAnalyzer;
 import com.xpam.webconnector.framework.i18n.MessageUtils;
 import com.xpam.webconnector.framework.jms.acl.ACLResult;
 import com.xpam.webconnector.framework.jms.entity.CommandRecord;
@@ -1126,7 +1127,7 @@ public class QueryConsole extends AbstractConsole {
             if (!this.canExecuteStatement(session, statement, aclResult)) {
                 break;
             }
-            var dataView = this.runSingleSQL(statement, aclResult);
+            var dataView = this.runSingleSQL(statement, aclResult, session);
             if (!dataView.isHasTable()) {
                 this.logAffectedRows(dataView);
             } else {
@@ -1317,9 +1318,14 @@ public class QueryConsole extends AbstractConsole {
         }
     }
 
-    private DataView runSingleSQL(String sql, ACLResult aclResult) throws SQLException {
+    private DataView runSingleSQL(String sql, ACLResult firstAclResult, Session session) throws SQLException {
 
         String sourceSQL = sql;
+        // XPAM: paging, refresh and a new row limit run the statement again. The first run was checked by the
+        // command rules (and reviewed when a rule asks for it); every later run is checked again, and only a plain
+        // read may run again from the result view: a statement that changes data (or that cannot be classified)
+        // must be run again from the editor, so an approval is never reused for a second execution.
+        final boolean[] firstRun = {true};
         DataView dataView = new DataView(
                 UUID.randomUUID().toString(),
                 sourceSQL,
@@ -1329,6 +1335,17 @@ public class QueryConsole extends AbstractConsole {
         dataView.setSql(sourceSQL);
 
         dataView.setLoadDataInterface((sqlQueryParams) -> {
+            ACLResult aclResult = firstAclResult;
+            if (!firstRun[0]) {
+                if (!this.isPlainRead(sourceSQL)) {
+                    throw new SQLException(MessageUtils.get("DataViewRerunRefused"));
+                }
+                aclResult = session.checkACL(sourceSQL, this.getConnection());
+                if (!this.canExecuteStatement(session, sourceSQL, aclResult)) {
+                    throw new SQLException(this.aclRejectMessage(aclResult));
+                }
+            }
+            firstRun[0] = false;
             sqlQueryParams.setTimeout(this.getState().getTimeout());
 
             SQLExecutePlan plan = this.datasource
@@ -1364,6 +1381,15 @@ public class QueryConsole extends AbstractConsole {
         return dataView;
     }
 
+
+    private boolean isPlainRead(String sql) {
+        DbType dbType = this.datasource == null ? null : this.datasource.getDruidDbType();
+        try {
+            return SqlStatementAnalyzer.analyze(dbType == null ? DbType.other : dbType, sql).estimable();
+        } catch (RuntimeException e) {
+            return false;
+        }
+    }
 
     private void sendDataView(DataView dataView, boolean clearOthers) {
         if (this.consoleMode) {
