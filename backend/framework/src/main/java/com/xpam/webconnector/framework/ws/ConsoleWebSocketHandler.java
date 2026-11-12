@@ -27,7 +27,6 @@ import java.util.Map;
 import java.util.Queue;
 import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
 
 @Slf4j
 public class ConsoleWebSocketHandler extends TextWebSocketHandler {
@@ -44,7 +43,22 @@ public class ConsoleWebSocketHandler extends TextWebSocketHandler {
     }
 
 
-    private final ExecutorService executorService = Executors.newFixedThreadPool(10);
+    // XPAM: each console's messages run one after another (SerialExecutor), and one can wait a long time (a reviewer's
+    // decision, a slow query). With 10 shared threads, ten such waits stalled every console of every user: the pool
+    // now grows with the busy consoles (idle threads end after a minute) and only queues beyond 256 at once.
+    private final ExecutorService executorService = consolePool();
+
+    static ExecutorService consolePool() {
+        var counter = new java.util.concurrent.atomic.AtomicInteger();
+        var pool = new java.util.concurrent.ThreadPoolExecutor(256, 256, 60L, java.util.concurrent.TimeUnit.SECONDS,
+                new java.util.concurrent.LinkedBlockingQueue<>(), runnable -> {
+                    Thread thread = new Thread(runnable, "webconnector-console-" + counter.incrementAndGet());
+                    thread.setDaemon(true);
+                    return thread;
+                });
+        pool.allowCoreThreadTimeOut(true);
+        return pool;
+    }
     private final Map<String, SerialExecutor> sessionExecutors = new ConcurrentHashMap<>();
 
     @Override
